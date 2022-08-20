@@ -6,11 +6,35 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 )
 
-func solveGame(chars string, dictionary []string) {
-	firstWordOptions := findValidWords(chars, dictionary)
-	fmt.Printf("%v\n", firstWordOptions)
+func solveGame(chars string, dictionary []string) [][]byte {
+	var board [][]byte
+	// firstWordOptions := findValidWords(chars, dictionary)
+	// fmt.Printf("%v\n", firstWordOptions)
+	var wg sync.WaitGroup
+	solution := make(chan [][]byte)
+	fail := make(chan bool)
+	go func() {
+		wg.Add(1)
+		search(&wg, chars, dictionary, board, solution)
+		wg.Wait()
+		fail <- true
+	}()
+	select {
+	case <-fail:
+		fmt.Println("main search failed :(")
+		return nil
+	case sol := <-solution:
+		return sol
+	}
+}
+
+func search(wg *sync.WaitGroup, chars string, dictionary []string, board [][]byte, done chan [][]byte) {
+	defer wg.Done()
+	ch := make(chan []byte)
+
 }
 
 func findValidWords(chars string, dictionary []string) (words []string) {
@@ -22,25 +46,21 @@ func findValidWords(chars string, dictionary []string) (words []string) {
 	if len(chars) < MAXLEN {
 		startLen = len(chars)
 	}
-
+	numValid := 0
 	for wordLen := startLen; wordLen >= MINLEN; wordLen-- {
-		fmt.Println(wordLen)
-		combs := combinations([]byte(chars), wordLen)
-		var perms [][]byte
-		for _, comb := range combs {
-			perms = append(perms, permutations(comb)...)
-		}
-		for _, word := range perms {
-			if validWord(string(word), dictionary) {
-				words = append(words, string(word))
+		perm([]byte(chars), func(str []byte) {
+			if validWord(string(str[:wordLen]), dictionary) {
+				words = append(words, string(str[:wordLen]))
+				numValid++
 			}
-		}
+		}, 0, wordLen)
 	}
 	return
 }
 
-func getDictionary(filename string) []string {
-	var dictionary []string
+func getDictionary(filename string) (dictionary []string) {
+	dictionary = make([]string, DICTLEN)
+	ind := 0
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)
@@ -49,9 +69,10 @@ func getDictionary(filename string) []string {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		dictionary = append(dictionary, scanner.Text())
+		dictionary[ind] = scanner.Text()
+		ind++
 	}
-	return dictionary
+	return
 }
 
 func validWord(word string, dictionary []string) bool {
@@ -112,66 +133,56 @@ func findPrefixMatches(prefix string, dictionary []string) (words []string) {
 	}
 }
 
-func combinations(iterable []byte, r int) (rt [][]byte) {
-	pool := iterable
-	n := len(pool)
+//// Perm calls f with each permutation of a.
+//func Perm(a []byte, f func([]byte)) {
+//	perm(a, f, 0, len(a))
+//}
 
-	if r > n {
-		return
+// gets permutations of string a
+// starts permuting at start and stops at the index before stop
+// if all is true, the entire string is included, regardless of where stop is
+// if all is false, the string up to
+func getPermutations(a string, start, stop int, all bool) (rt []string) {
+	rt = make([]string, permLen(len(a), stop-start))
+	i := 0
+	strStop := stop
+	strStart := start
+	if all {
+		strStop = len(a)
+		strStart = 0
 	}
-
-	indices := make([]int, r)
-	for i := range indices {
-		indices[i] = i
+	if stop < 0 {
+		stop = len(a) + stop
 	}
-
-	result := make([]byte, r)
-	for i, el := range indices {
-		result[i] = pool[el]
-	}
-	s2 := make([]byte, r)
-	copy(s2, result)
-	rt = append(rt, s2)
-
-	for {
-		i := r - 1
-		for ; i >= 0 && indices[i] == i+n-r; i -= 1 {
-		}
-
-		if i < 0 {
-			return
-		}
-
-		indices[i] += 1
-		for j := i + 1; j < r; j += 1 {
-			indices[j] = indices[j-1] + 1
-		}
-
-		for ; i < len(indices); i += 1 {
-			result[i] = pool[indices[i]]
-		}
-		s2 = make([]byte, r)
-		copy(s2, result)
-		rt = append(rt, s2)
-	}
-
+	perm([]byte(a), func(str []byte) {
+		rt[i] = string(str[strStart:strStop])
+		i++
+	}, start, stop)
+	fmt.Printf("num permutations: %d, should be: %d\n", len(rt), permLen(len(a), stop-start))
+	return
 }
 
-// given a string, generate all arrangements of characters
-func permutations(iterable []byte) (rt [][]byte) {
-	n := len(iterable)
-	if n == 1 {
-		rt = append(rt, iterable)
+// Permute the values at index i to stop.
+func perm(a []byte, f func([]byte), i, stop int) {
+	if i > stop-1 {
+		f(a)
 		return
 	}
-	for i := 0; i < n; i++ {
-		s1 := make([]byte, n-1)
-		copy(s1, iterable[:i])
-		copy(s1[i:], iterable[i+1:])
-		perms := permutations(s1)
-		for _, perm := range perms {
-			rt = append(rt, append([]byte{iterable[i]}, perm...))
-		}
+	perm(a, f, i+1, stop)
+	for j := i + 1; j < len(a); j++ {
+		a[i], a[j] = a[j], a[i]
+		perm(a, f, i+1, stop)
+		a[i], a[j] = a[j], a[i]
 	}
-	return
+}
+
+func permLen(n, k int) int {
+	return factorial(n) / factorial(n-k)
+}
+
+func factorial(x int) int {
+	if x <= 0 {
+		return 1
+	}
+	return x * factorial(x-1)
 }
