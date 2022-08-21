@@ -14,9 +14,14 @@ type Cell struct {
 	r, c int
 }
 
+type board [][]byte
+
+const EMPTY = byte(' ')
+
 type EmptySpace struct {
 	cell                    Cell
 	spaceBefore, spaceAfter int
+	isHorizontal            bool
 }
 
 type Game struct {
@@ -26,8 +31,8 @@ type Game struct {
 	dictionary []string
 }
 
-func (b *Game) print() {
-	for _, row := range b.board {
+func (b board) print() {
+	for _, row := range b {
 		fmt.Println(string(row))
 	}
 }
@@ -98,42 +103,162 @@ func search(wg *sync.WaitGroup, chars string, dictionary []string, board [][]byt
 // 	return
 // }
 
-func (g *Game) loadSpaces() {
-	for i, row := range g.board {
-		lastByte := byte('0')
-		lastCharCell := nil
-		leftCounter := -1
-		rightCounter := -1
-		horizontalWord := false
+// func (g *Game) loadSpaces() {
+// 	for i, row := range g.board {
+// 		lastByte := byte('0')
+// 		lastCharCell := nil
+// 		leftCounter := -1
+// 		rightCounter := -1
+// 		horizontalWord := false
+// 		for j, cell := range row {
+// 			if cell != 0 { // cell is a character
+// 				if horizontalWord {
+// 					continue
+// 				}
+// 				if lastChar != byte('0') {
+// 					horizontalWord = true
+// 					continue
+// 				}
+// 				lastCharCell := Cell{cell, i, j}
+// 				if rightCounter != -1 {
+// 					g.spaces = append(g.spaces, EmptySpace{lastCharCell, leftCounter, rightCounter - 1})
+// 					leftCounter = 0
+// 					rightCounter = -1
+// 				}
+// 			} else { // blank space
+// 				if lastByte {
+// 					lastByte = false
+// 					if hCounter != 0 {
+// 						hCounter = 1
+// 					}
+// 				}
+// 			}
+// 			lastByte =
+// 		}
+// 		if !horizontalWord && rightCounter > 0 {
+// 			g.spaces = append(g.spaces, EmptySpace{lastChar})
+// 		}
+// 	}
+// }
+
+// returns a slice of EmptySpace by looping through the board
+func (b board) getSpaces() []EmptySpace {
+	spaces := b.getHorizontalSpaces(false)
+	spaces = append(spaces, b.transposed().getHorizontalSpaces(true)...)
+	return spaces
+}
+
+func (b board) getHorizontalSpaces(isTransposed bool) (spaces []EmptySpace) {
+	for i, row := range b {
 		for j, cell := range row {
-			if cell != 0 { // cell is a character
-				if horizontalWord {
+			if isChar(cell) {
+				left, adjLeft := spaceLeft(i, j, b)
+				right, adjRight := spaceRight(i, j, b)
+				if !adjLeft || !adjRight || (left == 0 && right == 0) {
 					continue
 				}
-				if lastChar != byte('0') {
-					horizontalWord = true
-					continue
+				var newSpace EmptySpace
+				if !isTransposed {
+					newSpace = EmptySpace{Cell{cell, i, j}, left, right, true}
+				} else {
+					newSpace = EmptySpace{Cell{cell, j, i}, left, right, false}
 				}
-				lastCharCell := Cell{cell, i, j}
-				if rightCounter != -1 {
-					g.spaces = append(g.spaces, EmptySpace{lastCharCell, leftCounter, rightCounter - 1})
-					leftCounter = 0
-					rightCounter = -1
-				}
-			} else { // blank space
-				if lastByte {
-					lastByte = false
-					if hCounter != 0 {
-						hCounter = 1
-					}
-				}
+				spaces = append(spaces, newSpace)
 			}
-			lastByte = 
-		}
-		if !horizontalWord && rightCounter > 0 {
-			g.spaces = append(g.spaces, EmptySpace{lastChar})
 		}
 	}
+	return
+}
+
+func isChar(val byte) bool {
+	return val != EMPTY
+}
+
+// returns a transposed version of the board
+func (b board) transposed() board {
+	xl := len(b[0])
+	yl := len(b)
+	result := make(board, xl)
+	for i := range result {
+		result[i] = make([]byte, yl)
+	}
+	for i := 0; i < xl; i++ {
+		for j := 0; j < yl; j++ {
+			result[i][j] = b[j][i]
+		}
+	}
+	return result
+}
+
+// returns the amount of free space to the left of the given cell
+func spaceLeft(r, c int, board [][]byte) (int, bool) {
+	if c == 0 {
+		return -1, true
+	}
+	curCol := c
+	charSpace := 0
+	for {
+		curCol--
+		if curCol < 0 {
+			return -1, true
+		}
+		curByte := board[r][curCol]
+		if curByte == EMPTY {
+			if !hasVerticalAdjacent(r, curCol, board) {
+				charSpace++
+			} else {
+				return charSpace, true
+			}
+		} else {
+			return charSpace, false
+		}
+	}
+}
+
+// returns the amount of free space to the right of the given cell
+func spaceRight(r, c int, board [][]byte) (int, bool) {
+	if c == len(board)-1 {
+		return -1, true
+	}
+	curCol := c
+	charSpace := 0
+	for {
+		curCol++
+		if curCol == len(board[0]) {
+			return -1, true
+		}
+		curByte := board[r][curCol]
+		if curByte == EMPTY {
+			if !hasVerticalAdjacent(r, curCol, board) {
+				charSpace++
+			} else {
+				return charSpace, true
+			}
+		} else {
+			return charSpace, false
+		}
+	}
+}
+
+// returns true if the cell has an adjacent character (non-empty) above or below
+func hasVerticalAdjacent(r, c int, board [][]byte) bool {
+	if r == 0 {
+		if len(board) == 1 {
+			return false
+		}
+		if board[r+1][c] != EMPTY {
+			return true
+		}
+	} else if r == len(board)-1 {
+		if board[r-1][c] != EMPTY {
+			return true
+		}
+	} else {
+		if board[r+1][c] != EMPTY || board[r-1][c] != EMPTY {
+			return true
+		}
+	}
+	return false
 }
 
 func findValidWords(chars string, dictionary []string, validChan chan []byte) {
