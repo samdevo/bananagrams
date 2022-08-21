@@ -9,8 +9,36 @@ import (
 	"sync"
 )
 
-func solveGame(chars string, dictionary []string) [][]byte {
-	var board [][]byte
+type Cell struct {
+	char byte
+	r, c int
+}
+
+type EmptySpace struct {
+	cell                    Cell
+	spaceBefore, spaceAfter int
+}
+
+type Game struct {
+	board      [][]byte
+	spaces     []EmptySpace
+	chars      []byte
+	dictionary []string
+}
+
+func (b *Game) print() {
+	for _, row := range b.board {
+		fmt.Println(string(row))
+	}
+}
+
+func newGame(chars string, dict string) *Game {
+	dictionary := getDictionary("dictionary.txt")
+	return &Game{chars: []byte(chars), dictionary: dictionary}
+}
+
+func (game *Game) solve() [][]byte {
+	// var board [][]byte
 	// firstWordOptions := findValidWords(chars, dictionary)
 	// fmt.Printf("%v\n", firstWordOptions)
 	var wg sync.WaitGroup
@@ -18,7 +46,7 @@ func solveGame(chars string, dictionary []string) [][]byte {
 	fail := make(chan bool)
 	go func() {
 		wg.Add(1)
-		search(&wg, chars, dictionary, board, solution)
+		// game.sear
 		wg.Wait()
 		fail <- true
 	}()
@@ -34,10 +62,81 @@ func solveGame(chars string, dictionary []string) [][]byte {
 func search(wg *sync.WaitGroup, chars string, dictionary []string, board [][]byte, done chan [][]byte) {
 	defer wg.Done()
 	ch := make(chan []byte)
-
+	go findValidWords(chars, dictionary, ch)
+	for range ch {
+		// fmt.Println(string(str))
+		fmt.Println("____")
+	}
 }
 
-func findValidWords(chars string, dictionary []string) (words []string) {
+// func (g *Game) getSpaces
+
+// func addToBoard(str []byte, board [][]byte) [][]byte {
+// 	if len(board) == 0 {
+// 		return append(board, str)
+// 	}
+// 	for i, row := range board {
+// 		if row[0]
+// 	}
+// }
+
+// searches the board for the beginning of a word
+
+// func (b Game) findSpaces() (spaces []EmptySpace) {
+// 	for i, row := range b {
+// 		hCounter := -1
+// 		for j, cell := range row {
+// 			if cell != 0 {
+// 				if hCounter == -1 {
+// 					hCounter = 0
+// 				} else if hCounter == 0 {
+
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return
+// }
+
+func (g *Game) loadSpaces() {
+	for i, row := range g.board {
+		lastByte := byte('0')
+		lastCharCell := nil
+		leftCounter := -1
+		rightCounter := -1
+		horizontalWord := false
+		for j, cell := range row {
+			if cell != 0 { // cell is a character
+				if horizontalWord {
+					continue
+				}
+				if lastChar != byte('0') {
+					horizontalWord = true
+					continue
+				}
+				lastCharCell := Cell{cell, i, j}
+				if rightCounter != -1 {
+					g.spaces = append(g.spaces, EmptySpace{lastCharCell, leftCounter, rightCounter - 1})
+					leftCounter = 0
+					rightCounter = -1
+				}
+			} else { // blank space
+				if lastByte {
+					lastByte = false
+					if hCounter != 0 {
+						hCounter = 1
+					}
+				}
+			}
+			lastByte = 
+		}
+		if !horizontalWord && rightCounter > 0 {
+			g.spaces = append(g.spaces, EmptySpace{lastChar})
+		}
+	}
+}
+
+func findValidWords(chars string, dictionary []string, validChan chan []byte) {
 	if len(chars) < MINLEN {
 		return
 	}
@@ -46,15 +145,15 @@ func findValidWords(chars string, dictionary []string) (words []string) {
 	if len(chars) < MAXLEN {
 		startLen = len(chars)
 	}
-	numValid := 0
 	for wordLen := startLen; wordLen >= MINLEN; wordLen-- {
 		perm([]byte(chars), func(str []byte) {
 			if validWord(string(str[:wordLen]), dictionary) {
-				words = append(words, string(str[:wordLen]))
-				numValid++
+				fmt.Println(string(str[:wordLen]))
+				validChan <- str[:wordLen]
 			}
 		}, 0, wordLen)
 	}
+	close(validChan)
 	return
 }
 
