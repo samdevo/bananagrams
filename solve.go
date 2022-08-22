@@ -46,11 +46,11 @@ func (game *Game) solve() [][]byte {
 	// firstWordOptions := findValidWords(chars, dictionary)
 	// fmt.Printf("%v\n", firstWordOptions)
 	var wg sync.WaitGroup
-	solution := make(chan [][]byte)
+	solution := make(chan board)
 	fail := make(chan bool)
 	go func() {
 		wg.Add(1)
-		// game.sear
+		game.search(&wg, solution)
 		wg.Wait()
 		fail <- true
 	}()
@@ -75,8 +75,9 @@ func (g *Game) search(wg *sync.WaitGroup, done chan board) {
 	ch := make(chan ValidEntry)
 	emptySpaces := g.board.getSpaces()
 	go g.findValidWords(emptySpaces, ch)
-	for range ch {
+	for valid := range ch {
 		// fmt.Println(string(str))
+		fmt.Println(valid)
 		fmt.Println("____")
 	}
 }
@@ -93,7 +94,7 @@ func (g *Game) findValidWords(emptySpaces []EmptySpace, validChan chan ValidEntr
 			perm([]byte(g.chars), func(str []byte) {
 				word := str[:wordLen]
 				minInd := 0
-				maxInd := len(g.chars)
+				maxInd := wordLen - 1
 				if space.spaceBefore != -1 {
 					maxInd = space.spaceBefore
 				}
@@ -128,8 +129,6 @@ func (g *Game) findValidWords(emptySpaces []EmptySpace, validChan chan ValidEntr
 	// close(validChan)
 	// return
 }
-
-func getSpacesPerms(perm []byte)
 
 // func (g *Game) getSpaces
 

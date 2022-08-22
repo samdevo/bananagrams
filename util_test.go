@@ -97,3 +97,8 @@ func TestGetSpaces(t *testing.T) {
 	s3 := testBoard3.getSpaces()
 	fmt.Printf("%v\n%v\n", s1, s3)
 }
+
+func TestSearch(t *testing.T) {
+	g := &Game{testBoard1, []byte("ASDFGHEI"), getDictionary("dictionary.txt")}
+	g.solve()
+}
