@@ -92,6 +92,7 @@ func (g *Game) findValidWords(emptySpaces []EmptySpace, validChan chan ValidEntr
 		}
 		for wordLen := startLen; wordLen >= MINLEN; wordLen-- {
 			perm([]byte(g.chars), func(str []byte) {
+				fmt.Println(string(str))
 				word := str[:wordLen]
 				minInd := 0
 				maxInd := wordLen - 1
