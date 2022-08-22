@@ -25,8 +25,7 @@ type EmptySpace struct {
 }
 
 type Game struct {
-	board      [][]byte
-	spaces     []EmptySpace
+	board      board
 	chars      []byte
 	dictionary []string
 }
@@ -64,15 +63,73 @@ func (game *Game) solve() [][]byte {
 	}
 }
 
-func search(wg *sync.WaitGroup, chars string, dictionary []string, board [][]byte, done chan [][]byte) {
+type ValidEntry struct {
+	cell         Cell
+	entry        string
+	cellInd      int
+	isHorizontal bool
+}
+
+func (g *Game) search(wg *sync.WaitGroup, done chan board) {
 	defer wg.Done()
-	ch := make(chan []byte)
-	go findValidWords(chars, dictionary, ch)
+	ch := make(chan ValidEntry)
+	emptySpaces := g.board.getSpaces()
+	go g.findValidWords(emptySpaces, ch)
 	for range ch {
 		// fmt.Println(string(str))
 		fmt.Println("____")
 	}
 }
+
+func (g *Game) findValidWords(emptySpaces []EmptySpace, validChan chan ValidEntry) {
+	for _, space := range emptySpaces {
+		startLen := MAXLEN
+		if space.spaceBefore != -1 && space.spaceAfter != -1 {
+			if startLen > space.spaceBefore+space.spaceAfter {
+				startLen = space.spaceBefore + space.spaceAfter
+			}
+		}
+		for wordLen := startLen; wordLen >= MINLEN; wordLen-- {
+			perm([]byte(g.chars), func(str []byte) {
+				word := str[:wordLen]
+				minInd := 0
+				maxInd := len(g.chars)
+				if space.spaceBefore != -1 {
+					maxInd = space.spaceBefore
+				}
+				if space.spaceAfter != -1 {
+					minInd = wordLen - space.spaceAfter
+				}
+				for cellInd := minInd; cellInd <= maxInd; cellInd++ {
+					newWord := append(append(word[:cellInd], space.cell.char), word[cellInd:]...)
+					if validWord(string(newWord), g.dictionary) {
+						validChan <- ValidEntry{space.cell, string(newWord), cellInd, space.isHorizontal}
+					}
+				}
+			}, 0, wordLen)
+		}
+	}
+	// if len(chars) < MINLEN {
+	// 	return
+	// }
+
+	// startLen := MAXLEN
+	// if len(chars) < MAXLEN {
+	// 	startLen = len(chars)
+	// }
+	// for wordLen := startLen; wordLen >= MINLEN; wordLen-- {
+	// 	perm([]byte(chars), func(str []byte) {
+	// 		if validWord(string(str[:wordLen]), dictionary) {
+	// 			fmt.Println(string(str[:wordLen]))
+	// 			validChan <- str[:wordLen]
+	// 		}
+	// 	}, 0, wordLen)
+	// }
+	// close(validChan)
+	// return
+}
+
+func getSpacesPerms(perm []byte)
 
 // func (g *Game) getSpaces
 
@@ -217,7 +274,7 @@ func spaceLeft(r, c int, board [][]byte) (int, bool) {
 
 // returns the amount of free space to the right of the given cell
 func spaceRight(r, c int, board [][]byte) (int, bool) {
-	if c == len(board)-1 {
+	if c == len(board[0])-1 {
 		return -1, true
 	}
 	curCol := c
@@ -259,27 +316,6 @@ func hasVerticalAdjacent(r, c int, board [][]byte) bool {
 		}
 	}
 	return false
-}
-
-func findValidWords(chars string, dictionary []string, validChan chan []byte) {
-	if len(chars) < MINLEN {
-		return
-	}
-
-	startLen := MAXLEN
-	if len(chars) < MAXLEN {
-		startLen = len(chars)
-	}
-	for wordLen := startLen; wordLen >= MINLEN; wordLen-- {
-		perm([]byte(chars), func(str []byte) {
-			if validWord(string(str[:wordLen]), dictionary) {
-				fmt.Println(string(str[:wordLen]))
-				validChan <- str[:wordLen]
-			}
-		}, 0, wordLen)
-	}
-	close(validChan)
-	return
 }
 
 func getDictionary(filename string) (dictionary []string) {
