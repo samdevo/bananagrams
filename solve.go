@@ -70,19 +70,105 @@ type ValidEntry struct {
 	isHorizontal bool
 }
 
+// searches the game for a solution
 func (g *Game) search(wg *sync.WaitGroup, done chan board) {
 	defer wg.Done()
 	ch := make(chan ValidEntry)
+	// quit := make(chan bool)
 	emptySpaces := g.board.getSpaces()
 	go g.findValidWords(emptySpaces, ch)
 	for valid := range ch {
-		// fmt.Println(string(str))
 		fmt.Println(valid)
-		fmt.Println("____")
+		return
+	}
+	fmt.Println("done")
+}
+
+func (g *Game) addToBoard(entry ValidEntry) Game {
+	newWord := []byte(entry.entry)
+	var curBoard board
+	var wordStart int
+	var wordRow int
+	if entry.isHorizontal {
+		curBoard = g.board.transposed()
+		wordStart = entry.cell.r - entry.cellInd
+		wordRow = entry.cell.c
+	} else {
+		curBoard = g.board.copy()
+		wordStart = entry.cell.c - entry.cellInd
+		wordRow = entry.cell.r
+	}
+	newCols := wordStart * -1
+	for i := 0; i < newCols; i++ {
+		for i, row := range curBoard {
+			curBoard[i] = append([]byte{EMPTY}, row...)
+		}
+		wordStart++
+	}
+	curBoard[wordRow] =
+		append(append(
+			curBoard[wordRow][:wordStart],
+			newWord...),
+			curBoard[wordRow][wordStart+len(entry.entry):]...,
+		)
+	var charsLeft []byte
+	for _, char := range g.chars {
+		found := false
+		for j, charUsed := range newWord {
+			if j == entry.cellInd {
+				continue
+			}
+			if char == charUsed {
+				newWord[j] = EMPTY
+				break
+			}
+		}
+		if !found {
+			charsLeft = append(charsLeft, char)
+		}
+	}
+
+	var newBoard board
+	if !entry.isHorizontal {
+		newBoard = curBoard.transposed()
+	} else {
+		newBoard = curBoard
+	}
+
+	return Game{newBoard, charsLeft, g.dictionary}
+}
+
+// given a permutation and an empty space, determines if the permutation can create a ValidWord
+func processPerm(space EmptySpace, wordLen int, str []byte, validChan chan ValidEntry, dict []string) {
+	word := str[:wordLen]
+	// sstr := string(str)
+	// fmt.Println(sstr)
+	minInd := 0
+	maxInd := wordLen
+	if space.spaceBefore != -1 {
+		maxInd = space.spaceBefore
+	}
+	if space.spaceAfter != -1 {
+		minInd = wordLen - space.spaceAfter
+	}
+	for cellInd := minInd; cellInd <= maxInd; cellInd++ {
+		// newWord := []byte(strings.Clone(string(word)))
+		// newWordStr := string(append(append(newWord[:cellInd], space.cell.char), newWord[cellInd:]...))
+		newWordStr := strings.Join([]string{string(word[:cellInd]), string(word[cellInd:])}, string(space.cell.char))
+		// newWord := make([]byte, wordLen+1)
+		// copy(newWord, append(append(word[:cellInd], space.cell.char), word[cellInd:]...))
+
+		if validWord(newWordStr, dict) {
+
+			validChan <- ValidEntry{space.cell, newWordStr, cellInd, space.isHorizontal}
+
+		}
 	}
 }
 
+// given a game, pushes valid words that can be added to the board to the validChan channel
 func (g *Game) findValidWords(emptySpaces []EmptySpace, validChan chan ValidEntry) {
+	defer close(validChan)
 	for _, space := range emptySpaces {
 		startLen := MAXLEN
 		if space.spaceBefore != -1 && space.spaceAfter != -1 {
@@ -90,113 +176,16 @@ func (g *Game) findValidWords(emptySpaces []EmptySpace, validChan chan ValidEntr
 				startLen = space.spaceBefore + space.spaceAfter
 			}
 		}
-		for wordLen := startLen; wordLen >= MINLEN; wordLen-- {
+		if startLen > len(g.chars) {
+			startLen = len(g.chars)
+		}
+		for wordLen := startLen; wordLen >= MINLEN-1; wordLen-- {
 			perm([]byte(g.chars), func(str []byte) {
-				fmt.Println(string(str))
-				word := str[:wordLen]
-				minInd := 0
-				maxInd := wordLen - 1
-				if space.spaceBefore != -1 {
-					maxInd = space.spaceBefore
-				}
-				if space.spaceAfter != -1 {
-					minInd = wordLen - space.spaceAfter
-				}
-				for cellInd := minInd; cellInd <= maxInd; cellInd++ {
-					newWord := append(append(word[:cellInd], space.cell.char), word[cellInd:]...)
-					if validWord(string(newWord), g.dictionary) {
-						validChan <- ValidEntry{space.cell, string(newWord), cellInd, space.isHorizontal}
-					}
-				}
+				processPerm(space, wordLen, str, validChan, g.dictionary)
 			}, 0, wordLen)
 		}
 	}
-	// if len(chars) < MINLEN {
-	// 	return
-	// }
-
-	// startLen := MAXLEN
-	// if len(chars) < MAXLEN {
-	// 	startLen = len(chars)
-	// }
-	// for wordLen := startLen; wordLen >= MINLEN; wordLen-- {
-	// 	perm([]byte(chars), func(str []byte) {
-	// 		if validWord(string(str[:wordLen]), dictionary) {
-	// 			fmt.Println(string(str[:wordLen]))
-	// 			validChan <- str[:wordLen]
-	// 		}
-	// 	}, 0, wordLen)
-	// }
-	// close(validChan)
-	// return
 }
-
-// func (g *Game) getSpaces
-
-// func addToBoard(str []byte, board [][]byte) [][]byte {
-// 	if len(board) == 0 {
-// 		return append(board, str)
-// 	}
-// 	for i, row := range board {
-// 		if row[0]
-// 	}
-// }
-
-// searches the board for the beginning of a word
-
-// func (b Game) findSpaces() (spaces []EmptySpace) {
-// 	for i, row := range b {
-// 		hCounter := -1
-// 		for j, cell := range row {
-// 			if cell != 0 {
-// 				if hCounter == -1 {
-// 					hCounter = 0
-// 				} else if hCounter == 0 {
-
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return
-// }
-
-// func (g *Game) loadSpaces() {
-// 	for i, row := range g.board {
-// 		lastByte := byte('0')
-// 		lastCharCell := nil
-// 		leftCounter := -1
-// 		rightCounter := -1
-// 		horizontalWord := false
-// 		for j, cell := range row {
-// 			if cell != 0 { // cell is a character
-// 				if horizontalWord {
-// 					continue
-// 				}
-// 				if lastChar != byte('0') {
-// 					horizontalWord = true
-// 					continue
-// 				}
-// 				lastCharCell := Cell{cell, i, j}
-// 				if rightCounter != -1 {
-// 					g.spaces = append(g.spaces, EmptySpace{lastCharCell, leftCounter, rightCounter - 1})
-// 					leftCounter = 0
-// 					rightCounter = -1
-// 				}
-// 			} else { // blank space
-// 				if lastByte {
-// 					lastByte = false
-// 					if hCounter != 0 {
-// 						hCounter = 1
-// 					}
-// 				}
-// 			}
-// 			lastByte =
-// 		}
-// 		if !horizontalWord && rightCounter > 0 {
-// 			g.spaces = append(g.spaces, EmptySpace{lastChar})
-// 		}
-// 	}
-// }
 
 // returns a slice of EmptySpace by looping through the board
 func (b board) getSpaces() []EmptySpace {
@@ -245,6 +234,16 @@ func (b board) transposed() board {
 		}
 	}
 	return result
+}
+
+// copies a board
+func (b board) copy() (result board) {
+	result = make(board, len(b))
+	for i, row := range b {
+		result[i] = make([]byte, len(row))
+		copy(result[i], b[i])
+	}
+	return
 }
 
 // returns the amount of free space to the left of the given cell
@@ -322,10 +321,10 @@ func getDictionary(filename string) (dictionary []string) {
 	dictionary = make([]string, DICTLEN)
 	ind := 0
 	file, err := os.Open(filename)
+	defer file.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -393,15 +392,10 @@ func findPrefixMatches(prefix string, dictionary []string) (words []string) {
 	}
 }
 
-//// Perm calls f with each permutation of a.
-//func Perm(a []byte, f func([]byte)) {
-//	perm(a, f, 0, len(a))
-//}
-
 // gets permutations of string a
 // starts permuting at start and stops at the index before stop
 // if all is true, the entire string is included, regardless of where stop is
-// if all is false, the string up to
+// if all is false, the string up to stop
 func getPermutations(a string, start, stop int, all bool) (rt []string) {
 	rt = make([]string, permLen(len(a), stop-start))
 	i := 0

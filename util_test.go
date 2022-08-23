@@ -99,6 +99,6 @@ func TestGetSpaces(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	g := &Game{testBoard1, []byte("ASDFGHEI"), getDictionary("dictionary.txt")}
+	g := &Game{testBoard1, []byte("CR"), getDictionary("dictionary.txt")}
 	g.solve()
 }
