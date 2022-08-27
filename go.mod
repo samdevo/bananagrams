@@ -1,4 +1,4 @@
-module bananagrams
+module example.com/bananagrams
 
 go 1.16
 
