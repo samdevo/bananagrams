@@ -1,5 +1,8 @@
 module bananagrams
 
-go 1.18
+go 1.16
 
-require gonum.org/v1/gonum v0.11.0
+require (
+	github.com/GoogleCloudPlatform/functions-framework-go v1.6.1
+	gonum.org/v1/gonum v0.11.0
+)
