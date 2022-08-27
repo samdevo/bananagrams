@@ -19,6 +19,8 @@ func main() {
 		fmt.Printf("enter characters: \n")
 		chars, _ := userReader.ReadString('\n')
 		chars = strings.ToUpper(strings.Replace(chars, "\n", "", -1))
-		// solveGame(chars, dictionary)
+		game := newGame(chars, "dictionary.txt")
+		solution := game.solve()
+		solution.print()
 	}
 }

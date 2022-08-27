@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"strings"
-	"sync"
+	"time"
+
+	"gonum.org/v1/gonum/stat/combin"
 )
 
 type Cell struct {
@@ -31,9 +34,16 @@ type Game struct {
 }
 
 func (b board) print() {
+	if b == nil {
+		return
+	}
+	rows := len(b)
+	cols := len(b[0])
+	fmt.Printf("rows: %d, cols: %d \n--------------\n", rows, cols)
 	for _, row := range b {
 		fmt.Println(string(row))
 	}
+	fmt.Println("--------------------")
 }
 
 func newGame(chars string, dict string) *Game {
@@ -41,17 +51,17 @@ func newGame(chars string, dict string) *Game {
 	return &Game{chars: []byte(chars), dictionary: dictionary}
 }
 
-func (game *Game) solve() [][]byte {
-	// var board [][]byte
-	// firstWordOptions := findValidWords(chars, dictionary)
-	// fmt.Printf("%v\n", firstWordOptions)
-	var wg sync.WaitGroup
+func (game *Game) solve() board {
 	solution := make(chan board)
 	fail := make(chan bool)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
-		wg.Add(1)
-		game.search(&wg, solution)
-		wg.Wait()
+		if len(game.board) == 0 {
+			game.fromStartingGames(ctx, solution)
+		} else {
+			game.search(ctx, solution)
+		}
 		fail <- true
 	}()
 	select {
@@ -59,7 +69,12 @@ func (game *Game) solve() [][]byte {
 		fmt.Println("main search failed :(")
 		return nil
 	case sol := <-solution:
+		fmt.Println("solution received!")
+		// sol.print()
 		return sol
+	case <-time.After(30 * time.Second):
+		fmt.Println("timeout!")
+		return nil
 	}
 }
 
@@ -70,26 +85,53 @@ type ValidEntry struct {
 	isHorizontal bool
 }
 
+// seeds new games with boards of one character
+func (g *Game) fromStartingGames(ctx context.Context, done chan board) {
+	for i, char := range g.chars {
+		newBoard := make(board, 1)
+		newBoard[0] = []byte{char}
+		newChars := make([]byte, len(g.chars)-1)
+		for j := 0; j < len(g.chars)-1; j++ {
+			if j < i {
+				newChars[j] = g.chars[j]
+			} else {
+				newChars[j] = g.chars[j+1]
+			}
+		}
+		newGame := &Game{newBoard, newChars, g.dictionary}
+		newGame.search(ctx, done)
+	}
+}
+
 // searches the game for a solution
-func (g *Game) search(wg *sync.WaitGroup, done chan board) {
-	defer wg.Done()
+func (g *Game) search(ctx context.Context, done chan board) {
 	ch := make(chan ValidEntry)
 	// quit := make(chan bool)
 	emptySpaces := g.board.getSpaces()
-	go g.findValidWords(emptySpaces, ch)
+	go g.findValidWords(ctx, emptySpaces, ch)
 	for valid := range ch {
-		fmt.Println(valid)
-		return
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		newGame := g.addToBoard(valid)
+		// newGame.board.print()
+		if len(newGame.chars) == 0 {
+			// fmt.Println("found a solution!")
+			done <- newGame.board
+		}
+		newGame.search(ctx, done)
 	}
-	fmt.Println("done")
+	// fmt.Println("done searching current game")
 }
 
-func (g *Game) addToBoard(entry ValidEntry) Game {
+func (g *Game) addToBoard(entry ValidEntry) *Game {
 	newWord := []byte(entry.entry)
 	var curBoard board
 	var wordStart int
 	var wordRow int
-	if entry.isHorizontal {
+	if !entry.isHorizontal {
 		curBoard = g.board.transposed()
 		wordStart = entry.cell.r - entry.cellInd
 		wordRow = entry.cell.c
@@ -98,12 +140,18 @@ func (g *Game) addToBoard(entry ValidEntry) Game {
 		wordStart = entry.cell.c - entry.cellInd
 		wordRow = entry.cell.r
 	}
-	newCols := wordStart * -1
-	for i := 0; i < newCols; i++ {
+	newColsLeft := wordStart * -1
+	for i := 0; i < newColsLeft; i++ {
 		for i, row := range curBoard {
 			curBoard[i] = append([]byte{EMPTY}, row...)
 		}
 		wordStart++
+	}
+	newColsRight := wordStart + len(entry.entry) - len(curBoard[wordRow])
+	for i := 0; i < newColsRight; i++ {
+		for i, row := range curBoard {
+			curBoard[i] = append(row, EMPTY)
+		}
 	}
 	curBoard[wordRow] =
 		append(append(
@@ -120,6 +168,7 @@ func (g *Game) addToBoard(entry ValidEntry) Game {
 			}
 			if char == charUsed {
 				newWord[j] = EMPTY
+				found = true
 				break
 			}
 		}
@@ -135,17 +184,17 @@ func (g *Game) addToBoard(entry ValidEntry) Game {
 		newBoard = curBoard
 	}
 
-	return Game{newBoard, charsLeft, g.dictionary}
+	return &Game{newBoard, charsLeft, g.dictionary}
 }
 
 // given a permutation and an empty space, determines if the permutation can create a ValidWord
-func processPerm(space EmptySpace, wordLen int, str []byte, validChan chan ValidEntry, dict []string) {
+func processPerm(ctx context.Context, space EmptySpace, wordLen int, str []byte, validChan chan ValidEntry, dict []string) bool {
 	word := str[:wordLen]
 	// sstr := string(str)
 	// fmt.Println(sstr)
 	minInd := 0
 	maxInd := wordLen
-	if space.spaceBefore != -1 {
+	if space.spaceBefore != -1 && space.spaceBefore < wordLen {
 		maxInd = space.spaceBefore
 	}
 	if space.spaceAfter != -1 {
@@ -154,20 +203,36 @@ func processPerm(space EmptySpace, wordLen int, str []byte, validChan chan Valid
 	for cellInd := minInd; cellInd <= maxInd; cellInd++ {
 		// newWord := []byte(strings.Clone(string(word)))
 		// newWordStr := string(append(append(newWord[:cellInd], space.cell.char), newWord[cellInd:]...))
+		if cellInd == 3 && len(word) == 2 {
+			fmt.Println("HEREEE")
+		}
 		newWordStr := strings.Join([]string{string(word[:cellInd]), string(word[cellInd:])}, string(space.cell.char))
 		// newWord := make([]byte, wordLen+1)
 		// copy(newWord, append(append(word[:cellInd], space.cell.char), word[cellInd:]...))
 
 		if validWord(newWordStr, dict) {
-
-			validChan <- ValidEntry{space.cell, newWordStr, cellInd, space.isHorizontal}
+			select {
+			case <-ctx.Done():
+				return false
+			case validChan <- ValidEntry{space.cell, newWordStr, cellInd, space.isHorizontal}:
+			}
 
 		}
 	}
+	return true
+}
+
+// given a permutation of indices and the list of characters left, produce the given word
+func permToStr(inds []int, chars []byte) []byte {
+	newStr := make([]byte, len(inds))
+	for i, ind := range inds {
+		newStr[i] = chars[ind]
+	}
+	return newStr
 }
 
 // given a game, pushes valid words that can be added to the board to the validChan channel
-func (g *Game) findValidWords(emptySpaces []EmptySpace, validChan chan ValidEntry) {
+func (g *Game) findValidWords(ctx context.Context, emptySpaces []EmptySpace, validChan chan ValidEntry) {
 	defer close(validChan)
 	for _, space := range emptySpaces {
 		startLen := MAXLEN
@@ -180,9 +245,20 @@ func (g *Game) findValidWords(emptySpaces []EmptySpace, validChan chan ValidEntr
 			startLen = len(g.chars)
 		}
 		for wordLen := startLen; wordLen >= MINLEN-1; wordLen-- {
-			perm([]byte(g.chars), func(str []byte) {
-				processPerm(space, wordLen, str, validChan, g.dictionary)
-			}, 0, wordLen)
+			gen := combin.NewPermutationGenerator(len(g.chars), wordLen)
+			for gen.Next() {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				newPerm := gen.Permutation(nil)
+				newStr := permToStr(newPerm, g.chars)
+				if !processPerm(ctx, space, wordLen, newStr, validChan, g.dictionary) {
+					return
+				}
+			}
+
 		}
 	}
 }

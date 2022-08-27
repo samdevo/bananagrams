@@ -99,6 +99,28 @@ func TestGetSpaces(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
+	g := &Game{testBoard1, []byte("CROATEOAMTROVE"), getDictionary("dictionary.txt")}
+	sol := g.solve()
+	if sol == nil {
+		t.Error()
+	}
+}
+
+func TestAddToBoard(t *testing.T) {
 	g := &Game{testBoard1, []byte("CR"), getDictionary("dictionary.txt")}
-	g.solve()
+	e := ValidEntry{Cell{byte('A'), 0, 2}, "CAR", 1, true}
+	f := ValidEntry{Cell{byte('C'), 2, 2}, "CRASH", 0, true}
+	newGame := g.addToBoard(e)
+	newGame2 := newGame.addToBoard(f)
+	newGame.board.print()
+	newGame2.board.print()
+}
+
+func TestSearchEmpty(t *testing.T) {
+	g := &Game{board{}, []byte("CROATEOAMTROVEROAPROIUNDSERI"), getDictionary("dictionary.txt")}
+	sol := g.solve()
+	sol.print()
+	if sol == nil {
+		t.Error()
+	}
 }
