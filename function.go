@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
@@ -12,7 +13,17 @@ import (
 
 var mux = newMux()
 
+const gcloudFuncSourceDir = "serverless_function_source_code"
+
+func fixDir() {
+	fileInfo, err := os.Stat(gcloudFuncSourceDir)
+	if err == nil && fileInfo.IsDir() {
+		_ = os.Chdir(gcloudFuncSourceDir)
+	}
+}
+
 func init() {
+	fixDir()
 	functions.HTTP("HelloWorld", entryPoint)
 }
 
@@ -51,7 +62,7 @@ func solveHandler(w http.ResponseWriter, r *http.Request) {
 		for _, line := range solution {
 			solutionFlat += string(line) + "\n"
 		}
-		fmt.Fprintf(w, "%v\n", solutionFlat)
+		fmt.Fprintf(w, "%v", solutionFlat)
 	} else {
 		fmt.Fprintf(w, "No solution found\n")
 	}
