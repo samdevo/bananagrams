@@ -8,7 +8,7 @@ import (
 )
 
 const DICTLEN int = 178691
-const MAXLEN int = 7
+const MAXLEN int = 6
 const MINLEN int = 3
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 		chars, _ := userReader.ReadString('\n')
 		chars = strings.ToUpper(strings.Replace(chars, "\n", "", -1))
 		game := newGame(chars, "dictionary.txt")
-		solution := game.solve()
+		solution := game.solve(nil)
 		solution.print()
 	}
 }

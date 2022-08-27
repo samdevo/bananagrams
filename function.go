@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 )
@@ -56,15 +57,24 @@ func solveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	chars := strings.ToUpper(string(req.Chars))
 	game := newGame(chars, "dictionary.txt")
-	solution := game.solve()
-	if solution != nil {
+	boardStream := make(chan board)
+	var wg sync.WaitGroup
+	var solution board
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+		solution = game.solve(boardStream)
+	}()
+	for board := range boardStream {
 		solutionFlat := ""
-		for _, line := range solution {
+		for _, line := range board {
 			solutionFlat += string(line) + "\n"
 		}
 		fmt.Fprintf(w, "%v", solutionFlat)
-	} else {
-		fmt.Fprintf(w, "No solution found\n")
+	}
+	wg.Wait()
+	if solution == nil {
+		fmt.Fprintln(w, "Solution found!")
 	}
 }
 

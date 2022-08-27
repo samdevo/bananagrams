@@ -5,11 +5,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
-
-	"gonum.org/v1/gonum/stat/combin"
 )
 
 type Cell struct {
@@ -51,31 +50,31 @@ func newGame(chars string, dict string) *Game {
 	return &Game{chars: []byte(chars), dictionary: dictionary}
 }
 
-func (game *Game) solve() board {
+func (game *Game) solve(boardStream chan board) (sol board) {
+	defer close(boardStream)
 	solution := make(chan board)
 	fail := make(chan bool)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
 		if len(game.board) == 0 {
-			game.fromStartingGames(ctx, solution)
+			game.fromStartingGames(ctx, solution, boardStream)
 		} else {
-			game.search(ctx, solution)
+			game.search(ctx, solution, 0, boardStream)
 		}
 		fail <- true
 	}()
 	select {
 	case <-fail:
 		fmt.Println("main search failed :(")
-		return nil
-	case sol := <-solution:
+	case sol = <-solution:
+		cancel()
+		boardStream <- sol
 		fmt.Println("solution received!")
-		// sol.print()
-		return sol
-	case <-time.After(30 * time.Second):
+	case <-time.After(60 * time.Second):
 		fmt.Println("timeout!")
-		return nil
 	}
+	return
 }
 
 type ValidEntry struct {
@@ -86,7 +85,7 @@ type ValidEntry struct {
 }
 
 // seeds new games with boards of one character
-func (g *Game) fromStartingGames(ctx context.Context, done chan board) {
+func (g *Game) fromStartingGames(ctx context.Context, done chan board, boardStream chan board) {
 	for i, char := range g.chars {
 		newBoard := make(board, 1)
 		newBoard[0] = []byte{char}
@@ -98,30 +97,68 @@ func (g *Game) fromStartingGames(ctx context.Context, done chan board) {
 				newChars[j] = g.chars[j+1]
 			}
 		}
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(newChars), func(i, j int) { newChars[i], newChars[j] = newChars[j], newChars[i] })
 		newGame := &Game{newBoard, newChars, g.dictionary}
-		newGame.search(ctx, done)
+		newGame.search(ctx, done, 1, boardStream)
 	}
 }
 
+// func worker(jobChan chan *Game, ctx context.Context, done chan board) {
+// 	for game := range jobChan {
+// 		game.search(ctx, done)
+// 	}
+// }
+
 // searches the game for a solution
-func (g *Game) search(ctx context.Context, done chan board) {
+func (g *Game) search(ctx context.Context, done chan board, depth int, boardStream chan board) {
 	ch := make(chan ValidEntry)
+	doneSearching := make(chan bool)
 	// quit := make(chan bool)
 	emptySpaces := g.board.getSpaces()
-	go g.findValidWords(ctx, emptySpaces, ch)
-	for valid := range ch {
+	validCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go g.findValidWords(validCtx, emptySpaces, ch)
+	visited := make(map[string]bool)
+	for {
 		select {
+		case valid, ok := <-ch:
+			if !ok {
+				return
+			}
+			if visited[valid.entry] {
+				continue
+			}
+			visited[valid.entry] = true
+			fmt.Println("found valid entry: ", valid.entry)
+
+			newGame := g.addToBoard(valid)
+			fmt.Println("chars left: ", len(newGame.chars))
+			newGame.board.print()
+			select {
+			case boardStream <- newGame.board:
+			case <-ctx.Done():
+				return
+			}
+			// newGame.board.print()
+			if len(newGame.chars) == 0 {
+				// fmt.Println("found a solution!")
+				select {
+				case done <- newGame.board:
+				case <-ctx.Done():
+				}
+				return
+			}
+			fmt.Printf("depth: %d\n", depth)
+			newGame.search(ctx, done, depth+1, boardStream)
+		case <-doneSearching:
+			break
 		case <-ctx.Done():
 			return
-		default:
+		case <-time.After(10 * time.Second):
+			fmt.Println("timeout!")
+			return
 		}
-		newGame := g.addToBoard(valid)
-		// newGame.board.print()
-		if len(newGame.chars) == 0 {
-			// fmt.Println("found a solution!")
-			done <- newGame.board
-		}
-		newGame.search(ctx, done)
 	}
 	// fmt.Println("done searching current game")
 }
@@ -197,15 +234,13 @@ func processPerm(ctx context.Context, space EmptySpace, wordLen int, str []byte,
 	if space.spaceBefore != -1 && space.spaceBefore < wordLen {
 		maxInd = space.spaceBefore
 	}
-	if space.spaceAfter != -1 {
+	if space.spaceAfter != -1 && space.spaceAfter < wordLen {
 		minInd = wordLen - space.spaceAfter
 	}
 	for cellInd := minInd; cellInd <= maxInd; cellInd++ {
 		// newWord := []byte(strings.Clone(string(word)))
 		// newWordStr := string(append(append(newWord[:cellInd], space.cell.char), newWord[cellInd:]...))
-		if cellInd == 3 && len(word) == 2 {
-			fmt.Println("HEREEE")
-		}
+
 		newWordStr := strings.Join([]string{string(word[:cellInd]), string(word[cellInd:])}, string(space.cell.char))
 		// newWord := make([]byte, wordLen+1)
 		// copy(newWord, append(append(word[:cellInd], space.cell.char), word[cellInd:]...))
@@ -215,6 +250,7 @@ func processPerm(ctx context.Context, space EmptySpace, wordLen int, str []byte,
 			case <-ctx.Done():
 				return false
 			case validChan <- ValidEntry{space.cell, newWordStr, cellInd, space.isHorizontal}:
+				return true
 			}
 
 		}
@@ -235,6 +271,7 @@ func permToStr(inds []int, chars []byte) []byte {
 func (g *Game) findValidWords(ctx context.Context, emptySpaces []EmptySpace, validChan chan ValidEntry) {
 	defer close(validChan)
 	for _, space := range emptySpaces {
+		visited := make(map[string]bool)
 		startLen := MAXLEN
 		if space.spaceBefore != -1 && space.spaceAfter != -1 {
 			if startLen > space.spaceBefore+space.spaceAfter {
@@ -245,19 +282,35 @@ func (g *Game) findValidWords(ctx context.Context, emptySpaces []EmptySpace, val
 			startLen = len(g.chars)
 		}
 		for wordLen := startLen; wordLen >= MINLEN-1; wordLen-- {
-			gen := combin.NewPermutationGenerator(len(g.chars), wordLen)
-			for gen.Next() {
-				select {
-				case <-ctx.Done():
+			// gen := combin.NewPermutationGenerator(len(g.chars), wordLen)
+			// for gen.Next() {
+			// 	select {
+			// 	case <-ctx.Done():
+			// 		return
+			// 	default:
+			// 	}
+			// 	newPerm := gen.Permutation(nil)
+			// 	newStr := permToStr(newPerm, g.chars)
+			// 	if visited[string(newStr)] {
+			// 		continue
+			// 	}
+			// 	visited[string(newStr)] = true
+			// 	if !processPerm(ctx, space, wordLen, newStr, validChan, g.dictionary) {
+			// 		return
+			// 	}
+			// }
+			if len(g.chars)-wordLen != 0 && len(g.chars)-wordLen < 3 {
+				continue
+			}
+			perm(g.chars, func(newStr []byte) {
+				if visited[string(newStr)] {
 					return
-				default:
 				}
-				newPerm := gen.Permutation(nil)
-				newStr := permToStr(newPerm, g.chars)
+				visited[string(newStr)] = true
 				if !processPerm(ctx, space, wordLen, newStr, validChan, g.dictionary) {
 					return
 				}
-			}
+			}, 0, wordLen, ctx)
 
 		}
 	}
@@ -472,36 +525,41 @@ func findPrefixMatches(prefix string, dictionary []string) (words []string) {
 // starts permuting at start and stops at the index before stop
 // if all is true, the entire string is included, regardless of where stop is
 // if all is false, the string up to stop
-func getPermutations(a string, start, stop int, all bool) (rt []string) {
-	rt = make([]string, permLen(len(a), stop-start))
-	i := 0
-	strStop := stop
-	strStart := start
-	if all {
-		strStop = len(a)
-		strStart = 0
-	}
-	if stop < 0 {
-		stop = len(a) + stop
-	}
-	perm([]byte(a), func(str []byte) {
-		rt[i] = string(str[strStart:strStop])
-		i++
-	}, start, stop)
-	fmt.Printf("num permutations: %d, should be: %d\n", len(rt), permLen(len(a), stop-start))
-	return
-}
+// func getPermutations(a string, start, stop int, all bool) (rt []string) {
+// 	rt = make([]string, permLen(len(a), stop-start))
+// 	i := 0
+// 	strStop := stop
+// 	strStart := start
+// 	if all {
+// 		strStop = len(a)
+// 		strStart = 0
+// 	}
+// 	if stop < 0 {
+// 		stop = len(a) + stop
+// 	}
+// 	perm([]byte(a), func(str []byte) {
+// 		rt[i] = string(str[strStart:strStop])
+// 		i++
+// 	}, start, stop)
+// 	fmt.Printf("num permutations: %d, should be: %d\n", len(rt), permLen(len(a), stop-start))
+// 	return
+// }
 
 // Permute the values at index i to stop.
-func perm(a []byte, f func([]byte), i, stop int) {
+func perm(a []byte, f func([]byte), i, stop int, ctx context.Context) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
 	if i > stop-1 {
 		f(a)
 		return
 	}
-	perm(a, f, i+1, stop)
+	perm(a, f, i+1, stop, ctx)
 	for j := i + 1; j < len(a); j++ {
 		a[i], a[j] = a[j], a[i]
-		perm(a, f, i+1, stop)
+		perm(a, f, i+1, stop, ctx)
 		a[i], a[j] = a[j], a[i]
 	}
 }

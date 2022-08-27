@@ -33,13 +33,13 @@ func TestPrefixMatches(t *testing.T) {
 	t.Logf("%v", findPrefixMatches("APP", dictionary))
 }
 
-func TestGetPermutations(t *testing.T) {
-	//dictionary := getDictionary("dictionary.txt")
-	perms := getPermutations("ab", 0, 2, false)
-	t.Logf("%v", perms)
-	perms = getPermutations("hel", 0, 2, true)
-	t.Logf("%v", perms)
-}
+// func TestGetPermutations(t *testing.T) {
+// 	//dictionary := getDictionary("dictionary.txt")
+// 	perms := getPermutations("ab", 0, 2, false)
+// 	t.Logf("%v", perms)
+// 	perms = getPermutations("hel", 0, 2, true)
+// 	t.Logf("%v", perms)
+// }
 
 var testBoard1 board = [][]byte{
 	{' ', ' ', 'A', ' '},
@@ -100,7 +100,7 @@ func TestGetSpaces(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	g := &Game{testBoard1, []byte("CROATEOAMTROVE"), getDictionary("dictionary.txt")}
-	sol := g.solve()
+	sol := g.solve(nil)
 	if sol == nil {
 		t.Error()
 	}
@@ -118,9 +118,21 @@ func TestAddToBoard(t *testing.T) {
 
 func TestSearchEmpty(t *testing.T) {
 	g := &Game{board{}, []byte("CROATEOAMTROVEROAPROIUNDSERI"), getDictionary("dictionary.txt")}
-	sol := g.solve()
+	sol := g.solve(nil)
 	sol.print()
 	if sol == nil {
 		t.Error()
 	}
+}
+
+func TestGenerate(t *testing.T) {
+	chars := generateChars(50)
+	fmt.Printf("%v\n", "HERRFEGPHAGOOTOLFTHSETEEPHIEEASET")
+	g := newGame(chars, "dictionary.txt")
+	sol := g.solve(nil)
+	if sol == nil {
+		t.Error()
+	}
+
+	sol.print()
 }
