@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 )
@@ -57,22 +56,22 @@ func solveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	chars := strings.ToUpper(string(req.Chars))
 	game := newGame(chars, "dictionary.txt")
-	boardStream := make(chan board)
-	var wg sync.WaitGroup
+	// boardStream := make(chan board)
 	var solution board
-	go func() {
-		wg.Add(1)
-		defer wg.Done()
-		solution = game.solve(boardStream)
-	}()
-	for board := range boardStream {
-		solutionFlat := ""
-		for _, line := range board {
-			solutionFlat += string(line) + "\n"
-		}
-		fmt.Fprintf(w, "%v", solutionFlat)
+	// go func() {
+	// 	wg.Add(1)
+	// 	defer wg.Done()
+	// 	solution = game.solve()
+	// }()
+	solution = game.solve()
+	solution.print()
+	// for board := range boardStream {
+	solutionFlat := ""
+	for _, line := range solution {
+		solutionFlat += string(line) + "\n"
 	}
-	wg.Wait()
+	fmt.Fprintf(w, "%v", solutionFlat)
+
 	if solution == nil {
 		fmt.Fprintln(w, "Solution found!")
 	}
@@ -89,6 +88,10 @@ func generateHandler(w http.ResponseWriter, r *http.Request) {
 	var req GenerateRequest
 	if err := json.Unmarshal(bodyBytes, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.NumChars > 144 {
+		http.Error(w, "Too many characters", http.StatusBadRequest)
 		return
 	}
 	chars := generateChars(req.NumChars)

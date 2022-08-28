@@ -100,7 +100,7 @@ func TestGetSpaces(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	g := &Game{testBoard1, []byte("CROATEOAMTROVE"), getDictionary("dictionary.txt")}
-	sol := g.solve(nil)
+	sol := g.solve()
 	if sol == nil {
 		t.Error()
 	}
@@ -118,7 +118,7 @@ func TestAddToBoard(t *testing.T) {
 
 func TestSearchEmpty(t *testing.T) {
 	g := &Game{board{}, []byte("CROATEOAMTROVEROAPROIUNDSERI"), getDictionary("dictionary.txt")}
-	sol := g.solve(nil)
+	sol := g.solve()
 	sol.print()
 	if sol == nil {
 		t.Error()
@@ -129,7 +129,7 @@ func TestGenerate(t *testing.T) {
 	chars := generateChars(50)
 	fmt.Printf("%v\n", "HERRFEGPHAGOOTOLFTHSETEEPHIEEASET")
 	g := newGame(chars, "dictionary.txt")
-	sol := g.solve(nil)
+	sol := g.solve()
 	if sol == nil {
 		t.Error()
 	}

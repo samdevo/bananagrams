@@ -20,7 +20,7 @@ func main() {
 		chars, _ := userReader.ReadString('\n')
 		chars = strings.ToUpper(strings.Replace(chars, "\n", "", -1))
 		game := newGame(chars, "dictionary.txt")
-		solution := game.solve(nil)
+		solution := game.solve()
 		solution.print()
 	}
 }

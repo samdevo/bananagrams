@@ -50,17 +50,17 @@ func newGame(chars string, dict string) *Game {
 	return &Game{chars: []byte(chars), dictionary: dictionary}
 }
 
-func (game *Game) solve(boardStream chan board) (sol board) {
-	defer close(boardStream)
+func (game *Game) solve() (sol board) {
+	// defer close(boardStream)
 	solution := make(chan board)
 	fail := make(chan bool)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
 		if len(game.board) == 0 {
-			game.fromStartingGames(ctx, solution, boardStream)
+			game.fromStartingGames(ctx, solution)
 		} else {
-			game.search(ctx, solution, 0, boardStream)
+			game.search(ctx, solution, 0)
 		}
 		fail <- true
 	}()
@@ -68,8 +68,6 @@ func (game *Game) solve(boardStream chan board) (sol board) {
 	case <-fail:
 		fmt.Println("main search failed :(")
 	case sol = <-solution:
-		cancel()
-		boardStream <- sol
 		fmt.Println("solution received!")
 	case <-time.After(60 * time.Second):
 		fmt.Println("timeout!")
@@ -85,7 +83,7 @@ type ValidEntry struct {
 }
 
 // seeds new games with boards of one character
-func (g *Game) fromStartingGames(ctx context.Context, done chan board, boardStream chan board) {
+func (g *Game) fromStartingGames(ctx context.Context, done chan board) {
 	for i, char := range g.chars {
 		newBoard := make(board, 1)
 		newBoard[0] = []byte{char}
@@ -100,7 +98,7 @@ func (g *Game) fromStartingGames(ctx context.Context, done chan board, boardStre
 		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(newChars), func(i, j int) { newChars[i], newChars[j] = newChars[j], newChars[i] })
 		newGame := &Game{newBoard, newChars, g.dictionary}
-		newGame.search(ctx, done, 1, boardStream)
+		newGame.search(ctx, done, 1)
 	}
 }
 
@@ -111,7 +109,7 @@ func (g *Game) fromStartingGames(ctx context.Context, done chan board, boardStre
 // }
 
 // searches the game for a solution
-func (g *Game) search(ctx context.Context, done chan board, depth int, boardStream chan board) {
+func (g *Game) search(ctx context.Context, done chan board, depth int) {
 	ch := make(chan ValidEntry)
 	doneSearching := make(chan bool)
 	// quit := make(chan bool)
@@ -130,27 +128,27 @@ func (g *Game) search(ctx context.Context, done chan board, depth int, boardStre
 				continue
 			}
 			visited[valid.entry] = true
-			fmt.Println("found valid entry: ", valid.entry)
+			// fmt.Println("found valid entry: ", valid.entry)
 
 			newGame := g.addToBoard(valid)
-			fmt.Println("chars left: ", len(newGame.chars))
-			newGame.board.print()
-			select {
-			case boardStream <- newGame.board:
-			case <-ctx.Done():
-				return
-			}
+			// fmt.Println("chars left: ", len(newGame.chars))
 			// newGame.board.print()
+
 			if len(newGame.chars) == 0 {
-				// fmt.Println("found a solution!")
+				fmt.Println("found a solution!")
 				select {
 				case done <- newGame.board:
 				case <-ctx.Done():
 				}
 				return
 			}
-			fmt.Printf("depth: %d\n", depth)
-			newGame.search(ctx, done, depth+1, boardStream)
+			// select {
+			// case boardStream <- newGame.board:
+			// case <-ctx.Done():
+			// 	return
+			// }
+			// fmt.Printf("depth: %d\n", depth)
+			newGame.search(ctx, done, depth+1)
 		case <-doneSearching:
 			break
 		case <-ctx.Done():
