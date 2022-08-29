@@ -3,12 +3,20 @@ const btnSolve = document.getElementById('btnSolve')
 const solution = document.getElementById('solution')
 const chars = document.getElementById('chars')
 const numChars = document.getElementById('numChars')
+const loading = document.getElementById('loading')
+
+
+// // automatically update the width of chars to match the input width
+// chars.addEventListener('input', () => {
+//     chars.style.width = chars.value.length * 10 + 'px'
+// })
 
 
 // make an api call to https://bananagrams-sam.uc.r.appspot.com
 // and generate a string of numChars characters
 // and display it in the DOM
 btn.addEventListener('click', () => {
+    // loading.innerText = "loading..."
     body = JSON.stringify({
         numChars: parseInt(numChars.value)
         })
@@ -24,6 +32,7 @@ btn.addEventListener('click', () => {
     .then(data => {
         console.log(data)
         chars.value = data
+        // loading.innerText = ""
     })
     .catch(err => console.log(err))
     
