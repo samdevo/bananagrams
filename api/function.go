@@ -37,6 +37,16 @@ func newMux() *http.ServeMux {
 }
 
 func entryPoint(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Max-Age", "3600")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	// Set CORS headers for the main request.
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	mux.ServeHTTP(w, r)
 }
 
@@ -52,6 +62,7 @@ func solveHandler(w http.ResponseWriter, r *http.Request) {
 	var req SolveRequest
 	if err := json.Unmarshal(bodyBytes, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
 		return
 	}
 	chars := strings.ToUpper(string(req.Chars))
@@ -73,7 +84,7 @@ func solveHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", solutionFlat)
 
 	if solution == nil {
-		fmt.Fprintln(w, "Solution found!")
+		fmt.Fprintln(w, "no solution found :(")
 	}
 }
 

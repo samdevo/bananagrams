@@ -16,6 +16,13 @@ limitations under the License.
 /* [START gae_flex_node_css] */
 body {
   font-family: Verdana, Helvetica, sans-serif;
-  background-color: #CCCCFF;
+  background-color: #cad48f;
+  font-family: monospace;
+  font-size: 2em;
 }
 /* [END gae_flex_node_css] */
+
+#solution {
+  white-space: pre;
+  line-height: 0.75em;
+}

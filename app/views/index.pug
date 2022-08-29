@@ -5,4 +5,12 @@ html(lang="en")
     meta(charset='utf-8')
     link(rel="stylesheet", href="/static/main.css")
   body
-    p This is a static file serving example.
+    p Bananagrams solver!
+    input(type="number", value="21", id="numChars")
+    input(type="button", value="generate characters", id="btn")
+    br
+    br
+    input(type="text" id="chars", style="width: 30%;")
+    input(type="button", value="solve!", id="btnSolve")
+    p(id="solution")
+    script(src="/static/main.js")
