@@ -1,6 +1,8 @@
 # Bananagrams Solver
 
-Given a set of characters, this website finds a solution to the game bananagrams. URL: https://bananagrams-sam.uc.r.appspot.com
+Given a set of characters, this website finds a solution to the game bananagrams. 
+
+Live URL: https://bananagrams-sam.uc.r.appspot.com
 
 The api is written in Go and hosted using Google Cloud
 
