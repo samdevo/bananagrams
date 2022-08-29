@@ -69,7 +69,7 @@ func (game *Game) solve() (sol board) {
 		fmt.Println("main search failed :(")
 	case sol = <-solution:
 		fmt.Println("solution received!")
-	case <-time.After(60 * time.Second):
+	case <-time.After(30 * time.Second):
 		fmt.Println("timeout!")
 	}
 	return
