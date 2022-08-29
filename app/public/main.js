@@ -1,12 +1,16 @@
 const btn = document.getElementById('btn')
 const btnSolve = document.getElementById('btnSolve')
+const solution = document.getElementById('solution')
+const chars = document.getElementById('chars')
+const numChars = document.getElementById('numChars')
+
 
 // make an api call to https://bananagrams-sam.uc.r.appspot.com
 // and generate a string of numChars characters
 // and display it in the DOM
 btn.addEventListener('click', () => {
     body = JSON.stringify({
-        numChars: parseInt(document.getElementById('numChars').value)
+        numChars: parseInt(numChars.value)
         })
     fetch('https://bananagrams-func-xn6nonedta-uc.a.run.app/generate', {
         method: 'POST',
@@ -19,17 +23,21 @@ btn.addEventListener('click', () => {
     .then(res => res.text())
     .then(data => {
         console.log(data)
-        document.getElementById('chars').value = data
+        chars.value = data
     })
     .catch(err => console.log(err))
     
 })
 
 btnSolve.addEventListener('click', () => {
-    document.getElementById('solution').innerText = "loading..."
+    solution.innerText = "loading..."
     body = JSON.stringify({
-        chars: document.getElementById('chars').value
+        chars: chars.value
         })
+    if (chars.value.length == 0) {
+        solution.innerText = "no characters entered, try again"
+        return
+    }
     fetch('https://bananagrams-func-xn6nonedta-uc.a.run.app/solve', {
         method: 'POST',
         headers: {
@@ -41,7 +49,7 @@ btnSolve.addEventListener('click', () => {
     .then(res => res.text())
     .then(data => {
         console.log(data)
-        document.getElementById('solution').innerText = data
+        solution.innerText = data
     })
     .catch(err => console.log(err))
     
