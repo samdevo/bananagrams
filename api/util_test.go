@@ -126,10 +126,10 @@ func TestSearchEmpty(t *testing.T) {
 }
 
 func TestGenerate(t *testing.T) {
-	chars := generateChars(50)
-	fmt.Printf("%v\n", "HERRFEGPHAGOOTOLFTHSETEEPHIEEASET")
+	chars := generateChars(21)
+	// fmt.Printf("%v\n", "HERRFEGPHAGOOTOLFTHSETEEPHIEEASET")
 	g := newGame(chars, "dictionary.txt")
-	sol := g.solve()
+	sol := g.solveSetLen(3, 3)
 	if sol == nil {
 		t.Error()
 	}

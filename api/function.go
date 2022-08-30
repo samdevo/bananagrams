@@ -51,7 +51,9 @@ func entryPoint(w http.ResponseWriter, r *http.Request) {
 }
 
 type SolveRequest struct {
-	Chars string `json:"chars"`
+	Chars  string `json:"chars"`
+	MinLen int    `json:"minChars"`
+	MaxLen int    `json:"maxChars"`
 }
 
 // helloWorld writes "Hello, World!" to the HTTP response.
@@ -74,7 +76,7 @@ func solveHandler(w http.ResponseWriter, r *http.Request) {
 	// 	defer wg.Done()
 	// 	solution = game.solve()
 	// }()
-	solution = game.solve()
+	solution = game.solveSetLen(req.MinLen, req.MaxLen)
 	solution.print()
 	// for board := range boardStream {
 	solutionFlat := ""

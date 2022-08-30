@@ -8,8 +8,8 @@ import (
 )
 
 const DICTLEN int = 178691
-const MAXLEN int = 6
-const MINLEN int = 2
+const MAXLEN int = 5
+const MINLEN int = 3
 
 func main() {
 	dictionary := getDictionary("dictionary.txt")

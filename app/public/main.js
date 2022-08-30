@@ -4,6 +4,8 @@ const solution = document.getElementById('solution')
 const chars = document.getElementById('chars')
 const numChars = document.getElementById('numChars')
 const loading = document.getElementById('loading')
+const minLength = document.getElementById('minLength')
+const maxLength = document.getElementById('maxLength')
 
 
 // // automatically update the width of chars to match the input width
@@ -41,8 +43,11 @@ btn.addEventListener('click', () => {
 btnSolve.addEventListener('click', () => {
     solution.innerText = "loading..."
     body = JSON.stringify({
-        chars: chars.value
+        chars: chars.value,
+        minChars: parseInt(minLength.value),
+        maxChars: parseInt(maxLength.value)
         })
+    console.log(body)
     if (chars.value.length == 0) {
         solution.innerText = "no characters entered, try again"
         return

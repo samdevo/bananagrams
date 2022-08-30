@@ -58,9 +58,34 @@ func (game *Game) solve() (sol board) {
 	defer cancel()
 	go func() {
 		if len(game.board) == 0 {
-			game.fromStartingGames(ctx, solution)
+			game.fromStartingGames(ctx, solution, MINLEN, MAXLEN)
 		} else {
-			game.search(ctx, solution, 0)
+			game.search(ctx, solution, 0, MINLEN, MAXLEN)
+		}
+		fail <- true
+	}()
+	select {
+	case <-fail:
+		fmt.Println("main search failed :(")
+	case sol = <-solution:
+		fmt.Println("solution received!")
+	case <-time.After(30 * time.Second):
+		fmt.Println("timeout!")
+	}
+	return
+}
+
+func (game *Game) solveSetLen(minLen, maxLen int) (sol board) {
+	// defer close(boardStream)
+	solution := make(chan board)
+	fail := make(chan bool)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		if len(game.board) == 0 {
+			game.fromStartingGames(ctx, solution, minLen, maxLen)
+		} else {
+			game.search(ctx, solution, 0, minLen, maxLen)
 		}
 		fail <- true
 	}()
@@ -83,7 +108,7 @@ type ValidEntry struct {
 }
 
 // seeds new games with boards of one character
-func (g *Game) fromStartingGames(ctx context.Context, done chan board) {
+func (g *Game) fromStartingGames(ctx context.Context, done chan board, minLen, maxLen int) {
 	for i, char := range g.chars {
 		newBoard := make(board, 1)
 		newBoard[0] = []byte{char}
@@ -98,7 +123,7 @@ func (g *Game) fromStartingGames(ctx context.Context, done chan board) {
 		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(newChars), func(i, j int) { newChars[i], newChars[j] = newChars[j], newChars[i] })
 		newGame := &Game{newBoard, newChars, g.dictionary}
-		newGame.search(ctx, done, 1)
+		newGame.search(ctx, done, 1, minLen, maxLen)
 	}
 }
 
@@ -109,14 +134,14 @@ func (g *Game) fromStartingGames(ctx context.Context, done chan board) {
 // }
 
 // searches the game for a solution
-func (g *Game) search(ctx context.Context, done chan board, depth int) {
+func (g *Game) search(ctx context.Context, done chan board, depth, minLen, maxLen int) {
 	ch := make(chan ValidEntry)
 	doneSearching := make(chan bool)
 	// quit := make(chan bool)
 	emptySpaces := g.board.getSpaces()
 	validCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go g.findValidWords(validCtx, emptySpaces, ch)
+	go g.findValidWords(validCtx, emptySpaces, ch, minLen, maxLen)
 	visited := make(map[string]bool)
 	for {
 		select {
@@ -148,7 +173,7 @@ func (g *Game) search(ctx context.Context, done chan board, depth int) {
 			// 	return
 			// }
 			// fmt.Printf("depth: %d\n", depth)
-			newGame.search(ctx, done, depth+1)
+			newGame.search(ctx, done, depth+1, minLen, maxLen)
 		case <-doneSearching:
 			break
 		case <-ctx.Done():
@@ -266,11 +291,11 @@ func permToStr(inds []int, chars []byte) []byte {
 }
 
 // given a game, pushes valid words that can be added to the board to the validChan channel
-func (g *Game) findValidWords(ctx context.Context, emptySpaces []EmptySpace, validChan chan ValidEntry) {
+func (g *Game) findValidWords(ctx context.Context, emptySpaces []EmptySpace, validChan chan ValidEntry, minLen, maxLen int) {
 	defer close(validChan)
 	for _, space := range emptySpaces {
 		visited := make(map[string]bool)
-		startLen := MAXLEN
+		startLen := maxLen - 1
 		if space.spaceBefore != -1 && space.spaceAfter != -1 {
 			if startLen > space.spaceBefore+space.spaceAfter {
 				startLen = space.spaceBefore + space.spaceAfter
@@ -279,7 +304,7 @@ func (g *Game) findValidWords(ctx context.Context, emptySpaces []EmptySpace, val
 		if startLen > len(g.chars) {
 			startLen = len(g.chars)
 		}
-		for wordLen := startLen; wordLen >= MINLEN-1; wordLen-- {
+		for wordLen := startLen; wordLen >= minLen-1; wordLen-- {
 			// gen := combin.NewPermutationGenerator(len(g.chars), wordLen)
 			// for gen.Next() {
 			// 	select {
@@ -297,7 +322,7 @@ func (g *Game) findValidWords(ctx context.Context, emptySpaces []EmptySpace, val
 			// 		return
 			// 	}
 			// }
-			if len(g.chars)-wordLen != 0 && len(g.chars)-wordLen < 3 {
+			if len(g.chars)-wordLen != 0 && len(g.chars)-wordLen < minLen-1 {
 				continue
 			}
 			perm(g.chars, func(newStr []byte) {

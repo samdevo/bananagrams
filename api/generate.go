@@ -2,6 +2,7 @@ package function
 
 import (
 	"math/rand"
+	"time"
 )
 
 type CPop struct {
@@ -39,6 +40,7 @@ var cpops = []CPop{
 }
 
 func generateChars(numChars int) string {
+	rand.Seed(time.Now().UnixNano())
 	ccpops := make([]CPop, len(cpops))
 	copy(ccpops, cpops)
 	if numChars > 144 {
