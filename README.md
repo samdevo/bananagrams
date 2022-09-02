@@ -2,7 +2,7 @@
 
 Given a set of characters, this website finds a solution to the game bananagrams. 
 
-Live URL: https://bananagrams-sam.uc.r.appspot.com
+Live URL: https://samdevo.github.io/bananagrams/
 
 The solver api is written in Go and hosted using Google Cloud
 
