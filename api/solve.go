@@ -51,28 +51,7 @@ func newGame(chars string, dict string) *Game {
 }
 
 func (game *Game) solve() (sol board) {
-	// defer close(boardStream)
-	solution := make(chan board)
-	fail := make(chan bool)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		if len(game.board) == 0 {
-			game.fromStartingGames(ctx, solution, MINLEN, MAXLEN)
-		} else {
-			game.search(ctx, solution, 0, MINLEN, MAXLEN)
-		}
-		fail <- true
-	}()
-	select {
-	case <-fail:
-		fmt.Println("main search failed :(")
-	case sol = <-solution:
-		fmt.Println("solution received!")
-	case <-time.After(30 * time.Second):
-		fmt.Println("timeout!")
-	}
-	return
+	return game.solveSetLen(MINLEN, MAXLEN)
 }
 
 func (game *Game) solveSetLen(minLen, maxLen int) (sol board) {
