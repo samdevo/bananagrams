@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Bananagrams!</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/static/main.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+</head>
+
+<body>
+    <center>
+        <p>Bananagrams solver!</p><input type="number" value="21" id="numChars"><input type="button" value="generate characters" id="btn"><br>
+        <p class="length">min word length: &nbsp;</p><input id="minLength" type="number" value="3"><br>
+        <p class="length">max word length: &nbsp;</p><input id="maxLength" type="number" value="5"><br>
+        <p class="note">note: higher max word length increases computation time</p><input type="text" placeholder="characters" id="chars" style="width: 20%;"><input type="button" value="solve!" id="btnSolve">
+        <p id="solution"></p><a class="footer" href="https://github.com/samdevo/bananagrams">Link to source code</a>
+        <script src="/static/main.js"></script>
+    </center>
+</body>
+
+</html>
