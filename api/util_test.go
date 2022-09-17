@@ -28,11 +28,6 @@ func TestGetDictionary(t *testing.T) {
 	}
 }
 
-func TestPrefixMatches(t *testing.T) {
-	dictionary := getDictionary("dictionary.txt")
-	t.Logf("%v", findPrefixMatches("APP", dictionary))
-}
-
 // func TestGetPermutations(t *testing.T) {
 // 	//dictionary := getDictionary("dictionary.txt")
 // 	perms := getPermutations("ab", 0, 2, false)

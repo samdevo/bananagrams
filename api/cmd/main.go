@@ -20,3 +20,17 @@ func main() {
 		log.Fatalf("funcframework.Start: %v\n", err)
 	}
 }
+
+// func main() {
+// 	dictionary := getDictionary("dictionary.txt")
+// 	fmt.Printf("dictionary length: %d\n", len(dictionary))
+// 	userReader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		fmt.Printf("enter characters: \n")
+// 		chars, _ := userReader.ReadString('\n')
+// 		chars = strings.ToUpper(strings.Replace(chars, "\n", "", -1))
+// 		game := newGame(chars, "dictionary.txt")
+// 		solution := game.solve()
+// 		solution.print()
+// 	}
+// }

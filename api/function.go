@@ -15,6 +15,7 @@ var mux = newMux()
 
 const gcloudFuncSourceDir = "serverless_function_source_code"
 
+// if we are in GCP runtime, change source directory
 func fixDir() {
 	fileInfo, err := os.Stat(gcloudFuncSourceDir)
 	if err == nil && fileInfo.IsDir() {
@@ -22,20 +23,22 @@ func fixDir() {
 	}
 }
 
+// sets up the google cloud function
 func init() {
 	fixDir()
 	functions.HTTP("HelloWorld", entryPoint)
 }
 
+// newMux creates a new HTTP request multiplexer to handle different routes
 func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/solve", solveHandler)
 	mux.HandleFunc("/generate", generateHandler)
-	// mux.HandleFunc("/subroute/three", three)
 
 	return mux
 }
 
+// entrypoint for the HTTP function - routes the request through the servemux
 func entryPoint(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -56,7 +59,7 @@ type SolveRequest struct {
 	MaxLen int    `json:"maxChars"`
 }
 
-// helloWorld writes "Hello, World!" to the HTTP response.
+// handler for the /solve route
 func solveHandler(w http.ResponseWriter, r *http.Request) {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(r.Body)
@@ -69,13 +72,8 @@ func solveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	chars := strings.ToUpper(string(req.Chars))
 	game := newGame(chars, "dictionary.txt")
-	// boardStream := make(chan board)
 	var solution board
-	// go func() {
-	// 	wg.Add(1)
-	// 	defer wg.Done()
-	// 	solution = game.solve()
-	// }()
+
 	solution = game.solveSetLen(req.MinLen, req.MaxLen)
 	solution.print()
 	// for board := range boardStream {
@@ -94,6 +92,7 @@ type GenerateRequest struct {
 	NumChars int `json:"numChars"`
 }
 
+// handler for the generate route
 func generateHandler(w http.ResponseWriter, r *http.Request) {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(r.Body)

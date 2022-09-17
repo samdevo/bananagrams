@@ -10,6 +10,7 @@ type CPop struct {
 	pop  int
 }
 
+// number of each letter in a bananagrams bag
 var cpops = []CPop{
 	{'A', 13},
 	{'B', 3},
@@ -39,6 +40,7 @@ var cpops = []CPop{
 	{'Z', 2},
 }
 
+// generates numChars characters from cpops, without replacement
 func generateChars(numChars int) string {
 	rand.Seed(time.Now().UnixNano())
 	ccpops := make([]CPop, len(cpops))
@@ -48,15 +50,6 @@ func generateChars(numChars int) string {
 	}
 	chars := make([]byte, numChars)
 	for i := 0; i < numChars; i++ {
-		chars[i] = generateCharFromCPops(ccpops)
-	}
-	return string(chars)
-}
-
-// select n random chars from cpops, without replacement
-func generateCharsFromCPops(n int, ccpops []CPop) string {
-	chars := make([]byte, n)
-	for i := 0; i < n; i++ {
 		chars[i] = generateCharFromCPops(ccpops)
 	}
 	return string(chars)
